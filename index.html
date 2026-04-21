@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>監視通知コントロール</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface: #1e1e1e;
+            --primary: #bb86fc;
+            --on-primary: #000000;
+            --text: #ffffff;
+            --text-secondary: #aaaaaa;
+            --danger: #cf6679;
+            --success: #03dac6;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--surface);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        /* Toggle Switch CSS */
+        .switch-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .switch-label {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--success);
+            transition: color 0.3s;
+        }
+
+        .switch-label.muted {
+            color: var(--danger);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 80px;
+            height: 44px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 44px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 36px;
+            width: 36px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--danger); /* Red when muted */
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(36px);
+        }
+
+        .settings-card {
+            background-color: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            margin-top: 20px;
+        }
+
+        .settings-card label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .settings-card input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #1a1a1a;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: var(--on-primary);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.8;
+        }
+        
+        button:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+        }
+
+        #status-message {
+            font-size: 0.85rem;
+            margin-top: 10px;
+            min-height: 20px;
+        }
+        
+        .header-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-icon">🔔</div>
+        <h1>通知コントロール</h1>
+        <p class="subtitle">Synology Chatへの通知を制御します</p>
+
+        <div class="switch-container">
+            <div id="mute-label" class="switch-label">通知: ON (継続中)</div>
+            <label class="switch">
+                <input type="checkbox" id="mute-toggle" disabled>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div id="status-message" style="color: var(--text-secondary);">設定を読み込んでいます...</div>
+
+        <div class="settings-card">
+            <label for="db-url">Firebase Database URL (REST API)</label>
+            <input type="text" id="db-url" placeholder="https://your-project.firebaseio.com">
+            <button id="save-settings">設定を保存</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
