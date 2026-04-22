@@ -1,50 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const dbUrlInput = document.getElementById('db-url');
-    const saveBtn = document.getElementById('save-settings');
     const muteToggle = document.getElementById('mute-toggle');
     const muteLabel = document.getElementById('mute-label');
     const statusMessage = document.getElementById('status-message');
 
-    // ローカルストレージから設定を読み込む
-    const savedUrl = localStorage.getItem('firebase_db_url');
-    if (savedUrl) {
-        dbUrlInput.value = savedUrl;
-        fetchCurrentStatus();
-    } else {
-        statusMessage.textContent = '❌ 設定からFirebase URLを入力してください';
-        statusMessage.style.color = '#cf6679';
-    }
+    // ★ ここにURLをハードレコード（編集不可）
+    const FIREBASE_DB_URL = "https://synologychat-c1281-default-rtdb.firebaseio.com";
 
-    // 設定保存ボタン
-    saveBtn.addEventListener('click', () => {
-        let url = dbUrlInput.value.trim();
-        if (!url) {
-            alert('URLを入力してください');
-            return;
-        }
-        // スラッシュをトリム
-        if (url.endsWith('/')) {
-            url = url.slice(0, -1);
-        }
-        
-        localStorage.setItem('firebase_db_url', url);
-        statusMessage.textContent = '✅ 設定を保存しました';
-        statusMessage.style.color = '#03dac6';
-        fetchCurrentStatus();
-    });
+    // 初期ロード
+    fetchCurrentStatus();
 
     // 状態の取得
     async function fetchCurrentStatus() {
-        const url = localStorage.getItem('firebase_db_url');
-        if (!url) return;
-
         muteToggle.disabled = true;
         statusMessage.textContent = '状態を取得中...';
         statusMessage.style.color = '#aaaaaa';
 
         try {
-            // Firebase REST API のエンドポイント (status.json)
-            const endpoint = `${url}/status.json`;
+            const endpoint = `${FIREBASE_DB_URL}/status.json`;
             const response = await fetch(endpoint);
             
             if (!response.ok) {
@@ -63,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (error) {
             console.error(error);
-            statusMessage.textContent = '❌ 状態の取得に失敗しました。URLを確認してください。';
+            statusMessage.textContent = '❌ 状態の取得に失敗しました。';
             statusMessage.style.color = '#cf6679';
         }
     }
@@ -71,19 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // トグル切り替え時の処理
     muteToggle.addEventListener('change', async (e) => {
         const isMuted = e.target.checked;
-        const url = localStorage.getItem('firebase_db_url');
         
-        if (!url) return;
-
         muteToggle.disabled = true;
         statusMessage.textContent = '更新中...';
         statusMessage.style.color = '#aaaaaa';
         updateLabel(isMuted); // UIは先に反映
 
         try {
-            const endpoint = `${url}/status.json`;
+            const endpoint = `${FIREBASE_DB_URL}/status.json`;
             const response = await fetch(endpoint, {
-                method: 'PUT', // 既存データを上書き
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
