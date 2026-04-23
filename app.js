@@ -1,90 +1,152 @@
+// ★ Firebase Database URL (変更不可)
+const FIREBASE_DB_URL = "https://synologychat-c1281-default-rtdb.firebaseio.com";
+
 document.addEventListener('DOMContentLoaded', () => {
+    // DOM要素の取得
+    const mainCard = document.getElementById('main-card');
+    const statusContainer = document.getElementById('status-container');
+    const statusIcon = document.getElementById('status-icon');
+    const statusText = document.getElementById('status-text');
+    const statusDesc = document.getElementById('status-desc');
+    
+    const mutePanel = document.getElementById('mute-panel');
     const muteToggle = document.getElementById('mute-toggle');
-    const muteLabel = document.getElementById('mute-label');
-    const statusMessage = document.getElementById('status-message');
+    const muteTitle = document.getElementById('mute-title');
+    
+    const connDot = document.getElementById('conn-dot');
+    const connText = document.getElementById('conn-text');
 
-    // ★ ここにURLをハードレコード（編集不可）
-    const FIREBASE_DB_URL = "https://synologychat-c1281-default-rtdb.firebaseio.com";
+    // 現在の状態を保持
+    let currentSystemState = "unknown";
+    let isMuted = false;
 
-    // 初期ロード
-    fetchCurrentStatus();
+    // 初期起動時のデータ取得と定期ポーリングの開始
+    fetchStateLoop();
+    setInterval(fetchStateLoop, 3000); // 3秒おきに最新状態を取得
 
-    // 状態の取得
-    async function fetchCurrentStatus() {
-        muteToggle.disabled = true;
-        statusMessage.textContent = '状態を取得中...';
-        statusMessage.style.color = '#aaaaaa';
-
+    // --- Firebaseからデータを取得する処理 ---
+    async function fetchStateLoop() {
         try {
-            const endpoint = `${FIREBASE_DB_URL}/status.json`;
-            const response = await fetch(endpoint);
+            // Firebaseのルートパス (/.json) から全データを一括取得
+            const response = await fetch(`${FIREBASE_DB_URL}/.json`);
+            if (!response.ok) throw new Error('Network response was not ok');
             
-            if (!response.ok) {
-                throw new Error('ネットワークエラー');
+            const data = await response.json();
+            
+            // 通信成功UI
+            connDot.classList.add('active');
+            connText.textContent = 'Live Sync Active';
+
+            if (data) {
+                // system_state の取り出し (無ければ stopped 扱い)
+                const newState = data.system_state || "stopped";
+                // is_muted の取り出し
+                const newMuteState = data.is_muted === true;
+
+                // 状態が変化した時のみUIを更新する
+                if (currentSystemState !== newState || isMuted !== newMuteState) {
+                    currentSystemState = newState;
+                    isMuted = newMuteState;
+                    updateUI();
+                }
+            } else {
+                // データが空の場合
+                currentSystemState = "stopped";
+                isMuted = false;
+                updateUI();
             }
 
-            const data = await response.json();
-            const isMuted = data && data.is_muted === true;
-
-            muteToggle.checked = isMuted;
-            updateLabel(isMuted);
-            
-            muteToggle.disabled = false;
-            statusMessage.textContent = '✅ 接続成功。現在の状態を反映しました。';
-            statusMessage.style.color = '#03dac6';
-            
         } catch (error) {
-            console.error(error);
-            statusMessage.textContent = '❌ 状態の取得に失敗しました。';
-            statusMessage.style.color = '#cf6679';
+            console.error("Fetch Error:", error);
+            // エラー表示
+            connDot.classList.remove('active');
+            connText.textContent = 'Connection Defaulted. Retrying...';
         }
     }
 
-    // トグル切り替え時の処理
-    muteToggle.addEventListener('change', async (e) => {
-        const isMuted = e.target.checked;
-        
-        muteToggle.disabled = true;
-        statusMessage.textContent = '更新中...';
-        statusMessage.style.color = '#aaaaaa';
-        updateLabel(isMuted); // UIは先に反映
+    // --- UIの描画更新処理 ---
+    function updateUI() {
+        // 一旦すべての状態クラスをリセット
+        statusContainer.className = 'status-container';
+        muteToggle.disabled = false;
 
+        // トグルボタンの状態を反映
+        muteToggle.checked = isMuted;
+
+        if (isMuted) {
+            muteTitle.textContent = "🔇 転送ブロック中";
+            muteTitle.style.color = "var(--color-muted)";
+        } else {
+            muteTitle.textContent = "通知および画像転送は正常";
+            muteTitle.style.color = "#f8fafc";
+        }
+
+        switch(currentSystemState) {
+            case "alerting":
+                // 🚨 警報発生中
+                statusContainer.classList.add('state-alerting');
+                statusIcon.textContent = "🚨";
+                statusText.textContent = "Alarm Active!";
+                statusDesc.textContent = "監視カメラが警報トリガーを検知しました";
+                
+                // ミュートパネルをスッと表示
+                mutePanel.classList.add('visible');
+                break;
+
+            case "monitoring":
+                // 🟢 監視中（待機）
+                statusContainer.classList.add('state-monitoring');
+                statusIcon.textContent = "🛡️";
+                statusText.textContent = "Monitoring...";
+                statusDesc.textContent = "システムは正常に監視を行っています";
+                
+                // 警報中ではないのでミュートパネルは隠す
+                mutePanel.classList.remove('visible');
+                break;
+
+            case "stopped":
+            default:
+                // ⚪ 停止中
+                statusContainer.classList.add('state-stopped');
+                statusIcon.textContent = "💤";
+                statusText.textContent = "System Stopped";
+                statusDesc.textContent = "監視プログラムは現在停止しています";
+                
+                // 警報中ではないのでミュートパネルは隠す
+                mutePanel.classList.remove('visible');
+                break;
+        }
+    }
+
+    // --- ミュートボタン（トグル）が押された時の処理 ---
+    muteToggle.addEventListener('change', async (e) => {
+        const targetMuteState = e.target.checked;
+        
+        // 連続クリック防止
+        muteToggle.disabled = true;
+        
         try {
-            const endpoint = `${FIREBASE_DB_URL}/status.json`;
-            const response = await fetch(endpoint, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ is_muted: isMuted })
+            // is_muted の項目だけを更新する (HTTP PATCH)
+            const response = await fetch(`${FIREBASE_DB_URL}/.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_muted: targetMuteState })
             });
 
-            if (!response.ok) {
-                throw new Error('更新エラー');
-            }
-
-            statusMessage.textContent = '✅ 更新成功！';
-            statusMessage.style.color = '#03dac6';
+            if (!response.ok) throw new Error('Update failed');
             
+            // 成功したらローカルの変数も更新
+            isMuted = targetMuteState;
+            updateUI(); // 文字色などの変更を反映
+
         } catch (error) {
-            console.error(error);
-            statusMessage.textContent = '❌ 更新に失敗しました';
-            statusMessage.style.color = '#cf6679';
-            // 失敗したら元に戻す
-            muteToggle.checked = !isMuted;
-            updateLabel(!isMuted);
+            console.error("Update Error:", error);
+            alert("ミュートの切り替えに失敗しました。通信環境を確認してください。");
+            // 失敗時はスイッチを元に戻す
+            muteToggle.checked = !targetMuteState;
         } finally {
             muteToggle.disabled = false;
         }
     });
 
-    function updateLabel(isMuted) {
-        if (isMuted) {
-            muteLabel.textContent = '🔇 ミュート中 (通知OFF)';
-            muteLabel.classList.add('muted');
-        } else {
-            muteLabel.textContent = '🔔 通知: ON (継続中)';
-            muteLabel.classList.remove('muted');
-        }
-    }
 });
