@@ -151,11 +151,24 @@
                 if (data) {
                     const state = data.system_state || 'stopped';
                     const isMuted = data.is_muted || false;
+                    const lastUpdateStr = data.last_update || '';
                     
-                    statusBox.className = 'status-box status-' + state;
+                    // 生存確認 (Heartbeat Check): 2分以上更新がなければ停止とみなす
+                    let isOffline = false;
+                    if (lastUpdateStr) {
+                        const lastTime = new Date(lastUpdateStr.replace(/-/g, "/")).getTime();
+                        const now = new Date().getTime();
+                        if (now - lastTime > 120000) { // 120,000ms = 2分
+                            isOffline = true;
+                        }
+                    }
+
+                    const displayState = isOffline ? 'stopped' : state;
+                    statusBox.className = 'status-box status-' + displayState;
                     
                     let statusText = '';
-                    if (state === 'online') statusText = '🔵 起動中 (待機)';
+                    if (isOffline) statusText = '⚪ 停止中 (オフライン)';
+                    else if (state === 'online') statusText = '🔵 起動中 (待機)';
                     else if (state === 'monitoring') statusText = '🟢 監視中 (正常)';
                     else if (state === 'alerting') statusText = '🚨 警報発生中！';
                     else if (state === 'muted') statusText = '🔇 警報一時解除中';
@@ -163,15 +176,15 @@
                     
                     statusBox.innerText = statusText;
                     
-                    // Toggleの有効/無効化（警報中または一時解除中のみ操作可能）
-                    const canMute = (state === 'alerting' || state === 'muted');
+                    // Toggleの有効/無効化（警報中または一時解除中、かつオンラインの時のみ）
+                    const canMute = !isOffline && (state === 'alerting' || state === 'muted');
                     muteToggle.disabled = !canMute;
 
                     // Toggleの更新（ユーザーが操作中以外のみ）
                     if (!document.activeElement || document.activeElement.id !== 'mute-toggle') {
                         muteToggle.checked = isMuted;
                     }
-                    lastUpdate.innerText = data.last_update || '-';
+                    lastUpdate.innerText = lastUpdateStr || '-';
                 }
             } catch (e) {
                 statusBox.innerText = '⚠️ Connection Error';
