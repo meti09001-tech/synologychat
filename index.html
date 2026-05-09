@@ -38,8 +38,9 @@
         
         .status-monitoring { background: #e6f4ea; color: #1e8e3e; border: 1px solid #1e8e3e; }
         .status-alerting { background: #fce8e6; color: #d93025; border: 1px solid #d93025; animation: pulse 2s infinite; }
+        .status-muted { background: #fff4e5; color: #b76e00; border: 1px solid #b76e00; border-style: dashed; }
+        .status-online { background: #e8f0fe; color: #1a73e8; border: 1px solid #1a73e8; }
         .status-stopped { background: #f1f3f4; color: #5f6368; border: 1px solid #5f6368; }
-        .status-muted { border-style: dashed; opacity: 0.8; }
 
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -90,12 +91,18 @@
         }
         input:checked + .slider { background-color: #1a73e8; }
         input:checked + .slider:before { transform: translateX(26px); }
+        input:disabled + .slider { background-color: #f1f1f1; cursor: not-allowed; }
+        input:disabled + .slider:before { background-color: #ddd; }
 
         .footer {
             margin-top: 2rem;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: #999;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
         }
+        .debug-info { color: #aaa; margin-top: 5px; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -108,28 +115,32 @@
         </div>
 
         <div class="control-group">
-            <span class="control-label">警報通知を一時停止 (解除)</span>
-            <p class="description">ONにすると、現在発生中の警報に対する画像転送とチャット通知が停止します。</p>
+            <span class="control-label">警報通知を一時解除 (解除)</span>
+            <p class="description">警報発生中のみ操作可能です。ONにすると現在発生中の画像転送と通知が停止します。</p>
             
             <label class="switch">
-                <input type="checkbox" id="mute-toggle">
+                <input type="checkbox" id="mute-toggle" disabled>
                 <span class="slider"></span>
             </label>
         </div>
 
         <div class="footer">
-            Last Sync: <span id="last-update">-</span>
+            <div>Last Sync: <span id="last-update">-</span></div>
+            <div class="debug-info">Connected to:<br><span id="db-url-display">-</span></div>
         </div>
     </div>
 
     <script>
-        // 設定: Firebase URLを動的に取得するか、ここに直書きします
-        // アプリ側の設定から完結させるため、URLはFirebaseのルートを想定
-        const DB_URL = "https://synologychat-c1281-default-rtdb.firebaseio.com"; // デフォルト
+        // ※このURLはデスクトップアプリ側の保存時に自動で書き換えられます
+        const DB_URL_RAW = "https://realtime-database-e8771-default-rtdb.firebaseio.com/";
+        const DB_URL = DB_URL_RAW.replace(/\/+$/, ""); // 末尾のスラッシュを除去
 
         const statusBox = document.getElementById('status-box');
         const muteToggle = document.getElementById('mute-toggle');
         const lastUpdate = document.getElementById('last-update');
+        const dbUrlDisplay = document.getElementById('db-url-display');
+
+        dbUrlDisplay.innerText = DB_URL;
 
         async function updateStatus() {
             try {
@@ -141,38 +152,50 @@
                     const state = data.system_state || 'stopped';
                     const isMuted = data.is_muted || false;
                     
-                    // UI更新
-                    statusBox.className = 'status-box status-' + state + (isMuted ? ' status-muted' : '');
+                    statusBox.className = 'status-box status-' + state;
                     
                     let statusText = '';
-                    if (state === 'monitoring') statusText = '🟢 監視中 (正常)';
-                    else if (state === 'alerting') statusText = isMuted ? '🔇 警報中 (通知オフ)' : '🚨 警報発生中！';
+                    if (state === 'online') statusText = '🔵 起動中 (待機)';
+                    else if (state === 'monitoring') statusText = '🟢 監視中 (正常)';
+                    else if (state === 'alerting') statusText = '🚨 警報発生中！';
+                    else if (state === 'muted') statusText = '🔇 警報一時解除中';
                     else statusText = '⚪ 停止中';
                     
                     statusBox.innerText = statusText;
-                    muteToggle.checked = isMuted;
+                    
+                    // Toggleの有効/無効化（警報中または一時解除中のみ操作可能）
+                    const canMute = (state === 'alerting' || state === 'muted');
+                    muteToggle.disabled = !canMute;
+
+                    // Toggleの更新（ユーザーが操作中以外のみ）
+                    if (!document.activeElement || document.activeElement.id !== 'mute-toggle') {
+                        muteToggle.checked = isMuted;
+                    }
                     lastUpdate.innerText = data.last_update || '-';
                 }
             } catch (e) {
                 statusBox.innerText = '⚠️ Connection Error';
                 statusBox.className = 'status-box status-stopped';
+                muteToggle.disabled = true;
+                console.error("Fetch error:", e);
             }
         }
 
         muteToggle.addEventListener('change', async () => {
             const val = muteToggle.checked;
             try {
-                await fetch(`${DB_URL}/.json`, {
+                const res = await fetch(`${DB_URL}/.json`, {
                     method: 'PATCH',
                     body: JSON.stringify({ is_muted: val })
                 });
+                if (!res.ok) throw new Error();
+                console.log("Update success:", val);
             } catch (e) {
-                alert('更新に失敗しました');
+                alert('更新に失敗しました。Firebaseのルール設定やURLを確認してください。');
                 muteToggle.checked = !val;
             }
         });
 
-        // 3秒おきに更新
         setInterval(updateStatus, 3000);
         updateStatus();
     </script>
